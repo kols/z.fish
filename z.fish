@@ -1,23 +1,58 @@
 set -q _Z_DATA; or set -x _Z_DATA $HOME/.z
 test -d $_Z_DATA; and echo "ERROR: z.fish's datafile ($_Z_DATA) is a directory."
 
-function _z
+function __z_echo_dir
+    test -d (string replace -r '\|.*$' '' $argv); and echo $argv
+end
+
+function _z_add
+    set -l datafile $_Z_DATA
+    [ "$argv" = "$HOME" ]; and return
+
+    set -l tempfile "$datafile.(random)"
+    while read line
+        __z_echo_dir $line
+    end < "$datafile" | awk -v path="$argv" -v now=(date +%s) -F"|" '
+        BEGIN {
+            rank[path] = 1
+            time[path] = now
+        }
+        $2 >= 1 {
+            # drop ranks below 1
+            if( $1 == path ) {
+                rank[$1] = $2 + 1
+                time[$1] = now
+            } else {
+                rank[$1] = $2
+                time[$1] = $3
+            }
+            count += $2
+        }
+        END {
+            if( count > 9000 ) {
+                # aging
+                for( x in rank ) print x "|" 0.99*rank[x] "|" time[x]
+            } else for( x in rank ) print x "|" rank[x] "|" time[x]
+        }
+    ' ^/dev/null > "$tempfile"
+    [ $status -o ! -f "$datafile" ]; and env mv -f "$tempfile" "$datafile"
+    env rm -f "$tempfile"
+end
+
+function z
     set datafile $_Z_DATA
 
-    # bail if we don't own ~/.z and $_Z_OWNER not set
-    test -z "$_Z_OWNER" -a -f "$datafile" -a ! -O "$datafile"; and return
-
+    set -l fnd
+    set -l last
     for arg in $argv
-        switch $arg
-            case '*'
-                if test -z "$fnd"
-                    set fnd "$arg"
-                else
-                    set fnd "$fnd $arg"
-                end
+        if test -z "$fnd"
+            set fnd "$arg"
+        else
+            set fnd "$fnd $arg"
         end
         set last $arg
     end
+    [ -z $last ]; and return
 
     test -f "$datafile"; or return
 
@@ -98,6 +133,6 @@ function _z
     cd $cd
 end
 
-function z
-    _z $argv
+function __z_precmd --on-event fish_preexec
+    _z_add $PWD
 end
