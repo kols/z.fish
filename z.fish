@@ -7,7 +7,7 @@ end
 
 function _z_add
     set -l datafile $_Z_DATA
-    [ "$argv" = "$HOME" ]; and return
+    test "$argv" = "$HOME"; and return
 
     set -l tempfile "$datafile.(random)"
     while read line
@@ -35,7 +35,7 @@ function _z_add
             } else for( x in rank ) print x "|" rank[x] "|" time[x]
         }
     ' ^/dev/null > "$tempfile"
-    [ $status -o ! -f "$datafile" ]; and env mv -f "$tempfile" "$datafile"
+    test $status -eq 0 -o ! -f "$datafile"; and env mv -f "$tempfile" "$datafile"
     env rm -f "$tempfile"
 end
 
@@ -52,7 +52,7 @@ function z
         end
         set last $arg
     end
-    [ -z $last ]; and return
+    test -z $last; and return
 
     test -f "$datafile"; or return
 
